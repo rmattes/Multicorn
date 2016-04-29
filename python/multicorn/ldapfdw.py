@@ -87,6 +87,8 @@ import ldap3
 from multicorn.utils import log_to_postgres, ERROR
 from multicorn.compat import unicode_
 
+# To support ldap3 formatters
+from datetime import datetime
 
 SPECIAL_CHARS = {
     ord('*'): '\\2a',
@@ -120,10 +122,12 @@ class LdapFdw(ForeignDataWrapper):
         else:
             self.ldapuri = fdw_options["uri"]
         self.ldap = ldap3.Connection(
-            ldap3.Server(self.ldapuri),
+            ldap3.Server(self.ldapuri, get_info = ldap3.ALL),
             user=fdw_options.get("binddn", None),
             password=fdw_options.get("bindpwd", None),
-            client_strategy=ldap3.STRATEGY_SYNC_RESTARTABLE)
+            client_strategy=ldap3.STRATEGY_SYNC_RESTARTABLE,
+            check_names = True
+        )
         self.path = fdw_options["path"]
         self.scope = self.parse_scope(fdw_options.get("scope", None))
         self.object_class = fdw_options["objectclass"]
@@ -161,6 +165,9 @@ class LdapFdw(ForeignDataWrapper):
                     pgcolname = self.field_definitions[key.lower()].column_name
                     if pgcolname in self.array_columns:
                         value = value
+                    # some special attribute types
+                    elif (type(value) == datetime):
+                        value = str(value)
                     else:
                         value = value[0]
                     litem[pgcolname] = value
